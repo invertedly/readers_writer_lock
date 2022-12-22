@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Project Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="rwlock.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="reader_lock.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="writer_lock.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rwlock_exception.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="reader_lock.cpp">
+      <Filter>Project Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rwlock.cpp">
+      <Filter>Project Files</Filter>
+    </ClCompile>
+    <ClCompile Include="writer_lock.cpp">
+      <Filter>Project Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
