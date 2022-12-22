@@ -3,64 +3,209 @@
 #include "../readers_writer_lock/reader_lock.h"
 #include "../readers_writer_lock/rwlock.h"
 #include "../readers_writer_lock/rwlock_exception.h"
+#include "../readers_writer_lock/writer_lock.h"
 
 #include <memory>
+#include <chrono>
 
-TEST(rwlock, construct)
+TEST(rwlock, no_lock)
 {
-	rwlock::rwlock lock{};
+	auto rwlock_ptr = std::make_shared<rwlock::rwlock>(rwlock::rwlock{});
 
-	rwlock::rwlock& lock_ref = lock;
-	//rwlock::reader_lock reader_lock{ lock , false, -1 };
-	//EXPECT_FALSE(reader_lock.is_locked());
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
 
-	//auto ptr1 = std::make_shared<rwlock::reader_lock>(rwlock::reader_lock{lock, false});
-	auto ptr2 = std::make_shared<rwlock::rwlock>( rwlock::rwlock{});
-	//EXPECT_TRUE(ptr2);
-	//
-	//EXPECT_TRUE(lock.write_lock());
-
-	//EXPECT_FALSE(lock.is_write_locked_in_this_thread());
-	//EXPECT_TRUE(lock.is_write_locked_in_this_thread());
-	//ptr2->is_write_locked_in_this_thread();
-	//ptr2->write_lock();
-
-	EXPECT_FALSE(ptr2->is_write_locked_for_this_thread());
-	EXPECT_TRUE(ptr2->write_lock());
-	EXPECT_THROW(ptr2->write_lock(), rwlock::rwlock_exception);
-	EXPECT_TRUE(ptr2->is_write_locked_for_this_thread());
-	EXPECT_FALSE(ptr2->read_lock());
-	EXPECT_NO_THROW(ptr2->write_unlock());
-	EXPECT_FALSE(ptr2->is_write_locked_for_this_thread());
+	EXPECT_THROW(rwlock_ptr->read_unlock(), rwlock::rwlock_exception);
+	EXPECT_THROW(rwlock_ptr->write_unlock(), rwlock::rwlock_exception);
 }
 
-//#include <chrono>
-//#include <mutex>
-//#include <thread>
-//#include <iostream>
-//using namespace std;
-//mutex m;
-//void funcA()
+TEST(rwlock, read_lock)
+{
+	auto rwlock_ptr = std::make_shared<rwlock::rwlock>(rwlock::rwlock{});
+
+	EXPECT_TRUE(rwlock_ptr->read_lock());
+
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_TRUE(rwlock_ptr->is_read_locked_for_this_thread());
+	EXPECT_THROW(rwlock_ptr->read_lock(), rwlock::rwlock_exception);
+	EXPECT_FALSE(rwlock_ptr->write_lock());
+	EXPECT_THROW(rwlock_ptr->write_unlock(), rwlock::rwlock_exception);
+
+	std::jthread read_locker([&]()
+		{
+			EXPECT_TRUE(rwlock_ptr->read_lock());
+
+			EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+			EXPECT_TRUE(rwlock_ptr->is_read_locked_for_this_thread());
+			EXPECT_THROW(rwlock_ptr->read_lock(), rwlock::rwlock_exception);
+			EXPECT_FALSE(rwlock_ptr->write_lock());
+			EXPECT_THROW(rwlock_ptr->write_unlock(), rwlock::rwlock_exception);
+
+			EXPECT_NO_THROW(rwlock_ptr->read_unlock());
+
+			EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+			EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+		});
+
+	read_locker.join();
+
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_TRUE(rwlock_ptr->is_read_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->write_lock());
+
+	EXPECT_NO_THROW(rwlock_ptr->read_unlock(), rwlock::rwlock_exception);
+
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+	EXPECT_TRUE(rwlock_ptr->write_lock());
+
+	EXPECT_NO_THROW(rwlock_ptr->write_unlock());
+}
+
+TEST(rwlock, write_lock)
+{
+	auto rwlock_ptr = std::make_shared<rwlock::rwlock>(rwlock::rwlock{});
+
+	EXPECT_TRUE(rwlock_ptr->write_lock());
+
+	EXPECT_THROW(rwlock_ptr->write_lock(), rwlock::rwlock_exception);
+	EXPECT_TRUE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->read_lock());
+	EXPECT_THROW(rwlock_ptr->read_unlock(), rwlock::rwlock_exception);
+	EXPECT_TRUE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+
+	std::jthread write_locker([&]()
+		{
+			EXPECT_TRUE(rwlock_ptr->write_lock(1000000));
+
+			EXPECT_TRUE(rwlock_ptr->is_write_locked_for_this_thread());
+			EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+			EXPECT_THROW(rwlock_ptr->write_lock(), rwlock::rwlock_exception);
+			EXPECT_FALSE(rwlock_ptr->read_lock());
+			EXPECT_THROW(rwlock_ptr->read_unlock(), rwlock::rwlock_exception);
+
+			EXPECT_NO_THROW(rwlock_ptr->write_unlock());
+
+			EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+			EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+		});
+
+	EXPECT_TRUE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_NO_THROW(rwlock_ptr->write_unlock(), rwlock::rwlock_exception);
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	write_locker.join();
+
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+	EXPECT_TRUE(rwlock_ptr->write_lock());
+	EXPECT_NO_THROW(rwlock_ptr->write_unlock());
+
+	EXPECT_FALSE(rwlock_ptr->is_write_locked_for_this_thread());
+	EXPECT_FALSE(rwlock_ptr->is_read_locked_for_this_thread());
+
+	EXPECT_TRUE(rwlock_ptr->read_lock());
+	EXPECT_NO_THROW(rwlock_ptr->read_unlock());
+}
+
+TEST(readers_writer_lock, construct)
+{
+	auto rwlock_ptr = std::make_shared<rwlock::rwlock>(rwlock::rwlock{});
+
+	rwlock::reader_lock reader1(rwlock_ptr, false);
+	EXPECT_FALSE(reader1.is_locked());
+	rwlock::writer_lock writer1(rwlock_ptr, false);
+	EXPECT_FALSE(writer1.is_locked());
+
+	rwlock::reader_lock reader2(rwlock_ptr, true);
+	EXPECT_TRUE(reader2.is_locked());
+	EXPECT_NO_THROW(reader2.unlock());
+	EXPECT_THROW(reader2.unlock(), rwlock::rwlock_exception);
+	EXPECT_FALSE(reader2.is_locked());
+
+	rwlock::writer_lock writer2(rwlock_ptr, true);
+	EXPECT_TRUE(writer2.is_locked());
+	EXPECT_NO_THROW(writer2.unlock());
+	EXPECT_THROW(writer2.unlock(), rwlock::rwlock_exception);
+	EXPECT_FALSE(writer2.is_locked());
+}
+
+TEST(readers_writer_lock, lock)
+{
+	auto rwlock_ptr = std::make_shared<rwlock::rwlock>(rwlock::rwlock{});
+
+	rwlock::reader_lock reader1{rwlock_ptr, false};
+
+	EXPECT_TRUE(reader1.lock());
+	EXPECT_TRUE(reader1.is_locked());
+
+	rwlock::writer_lock writer1(rwlock_ptr, false);
+	EXPECT_FALSE(writer1.lock());
+	EXPECT_FALSE(writer1.is_locked());
+
+	std::jthread locker1([](std::shared_ptr<rwlock::rwlock> rwlock_ptr)
+		{
+			rwlock::reader_lock reader2{ rwlock_ptr, false };
+			EXPECT_TRUE(reader2.lock());
+			EXPECT_TRUE(reader2.is_locked());
+			EXPECT_NO_THROW(reader2.unlock());
+
+			rwlock::writer_lock writer2{ rwlock_ptr, false };
+			EXPECT_FALSE(writer2.lock());
+		}, rwlock_ptr);
+
+	locker1.join();
+
+	EXPECT_NO_THROW(reader1.unlock());
+	EXPECT_TRUE(writer1.lock());
+	EXPECT_TRUE(writer1.is_locked());
+}
+
+//class rwlocked_data final
 //{
-//	cout << "FuncA Before lock" << endl;
-//	unique_lock<mutex> mLock(m);
-//	//thread 2
-//	cout << "FuncA After lock" << endl;
-//	std::chrono::milliseconds dura(500);//make sure thread is running
-//	std::this_thread::sleep_for(dura);        //this_thread::sleep_for(dura);
-//	cout << "FuncA After sleep" << endl;
-//}
+//	std::string data_;
+//	mutable std::shared_ptr<rwlock::rwlock> rwlock_ptr_;
+//	std::condition_variable_any condition_var_any_;
+//public:
+//	rwlocked_data() : data_("some data"), rwlock_ptr_(new rwlock::rwlock)
+//	{
+//	}
 //
-//int main(int argc, char* argv[])
-//{
-//	cout << "Main before lock" << endl;
-//	unique_lock<mutex> mLock(m);
-//	auto a = std::thread(funcA);
-//	std::chrono::milliseconds dura(1000);//make sure thread is running
-//	std::this_thread::sleep_for(dura);        //this_thread::sleep_for(dura);
-//	mLock.unlock();//Unlocks thread 2's lock?
-//	cout << "Main After unlock" << endl;
-//	a.join();
-//	cout << "Main after a.join" << endl;
-//	return 0;
-//}
+//	std::string read() const
+//	{
+//		rwlock::reader_lock lock(rwlock_ptr_, true);
+//
+//		
+//
+//		return data_;
+//	}
+//
+//	void write()
+//	{
+//		rw
+//	}
+//};
+
+TEST(readers_writer_lock, single_thread_time_test)
+{
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+
+
+
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
+}
+
+
+TEST(readers_writer_lock, multi_thread_time_test)
+{
+	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+
+
+	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
+}

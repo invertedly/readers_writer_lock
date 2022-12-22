@@ -10,8 +10,8 @@ namespace rwlock
         std::unordered_set<std::thread::id> reader_thread_id_;
         std::thread::id writer_thread_id_;
 
-		std::unique_ptr<std::shared_mutex> external_mutex_;
-		std::unique_ptr<std::mutex> internal_mutex_;
+		std::unique_ptr<std::shared_mutex> external_mutex_ptr_;
+		std::unique_ptr<std::mutex> internal_mutex_ptr_;
 
         std::condition_variable condition_variable_;
 

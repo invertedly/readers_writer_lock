@@ -6,7 +6,7 @@ namespace rwlock
 {
 	bool rwlock::try_write_lock() noexcept
 	{
-		const bool write_lock_success = external_mutex_->try_lock();
+		const bool write_lock_success = external_mutex_ptr_->try_lock();
 
 		if (write_lock_success)
 		{
@@ -18,7 +18,7 @@ namespace rwlock
 
 	bool rwlock::try_read_lock() noexcept
 	{
-		const bool read_lock_success = external_mutex_->try_lock_shared();
+		const bool read_lock_success = external_mutex_ptr_->try_lock_shared();
 
 		if (read_lock_success)
 		{
@@ -29,19 +29,20 @@ namespace rwlock
 	}
 
 	rwlock::rwlock()
-		: external_mutex_(new std::shared_mutex),
-		  internal_mutex_(new std::mutex)
+		: writer_thread_id_(std::thread::id()),
+		  external_mutex_ptr_(new std::shared_mutex),
+		  internal_mutex_ptr_(new std::mutex)
 	{
 	}
 
 	rwlock::rwlock(rwlock&& other) noexcept
 	{
-		std::scoped_lock rhs_lock(*other.internal_mutex_);
+		std::scoped_lock rhs_lock(*other.internal_mutex_ptr_);
 
 		reader_thread_id_ = std::move(other.reader_thread_id_);
 		writer_thread_id_ = other.writer_thread_id_;
-		external_mutex_ = std::move(other.external_mutex_);
-		internal_mutex_ = std::move(other.internal_mutex_);
+		external_mutex_ptr_ = std::move(other.external_mutex_ptr_);
+		internal_mutex_ptr_ = std::move(other.internal_mutex_ptr_);
 	}
 
 	rwlock& rwlock::operator=(rwlock&& other) noexcept
@@ -51,21 +52,21 @@ namespace rwlock
 			return *this;
 		}
 
-		std::unique_lock lhs_lock(*internal_mutex_, std::defer_lock);
-		std::unique_lock rhs_lock(*other.internal_mutex_, std::defer_lock);
+		std::unique_lock lhs_lock(*internal_mutex_ptr_, std::defer_lock);
+		std::unique_lock rhs_lock(*other.internal_mutex_ptr_, std::defer_lock);
 		std::lock(lhs_lock, rhs_lock);
 
 		reader_thread_id_ = std::move(other.reader_thread_id_);
 		writer_thread_id_ = other.writer_thread_id_;
-		external_mutex_ = std::move(other.external_mutex_);
-		internal_mutex_ = std::move(other.internal_mutex_);
+		external_mutex_ptr_ = std::move(other.external_mutex_ptr_);
+		internal_mutex_ptr_ = std::move(other.internal_mutex_ptr_);
 
 		return *this;
 	}
 
 	bool rwlock::read_lock(const int64_t timeout_ms)
 	{
-		std::unique_lock lock(*internal_mutex_);
+		std::unique_lock lock(*internal_mutex_ptr_);
 
 		if (reader_thread_id_.contains(std::this_thread::get_id()))
 		{
@@ -94,11 +95,11 @@ namespace rwlock
 	}
 	void rwlock::read_unlock()
 	{
-		std::scoped_lock lock(*internal_mutex_);
+		std::scoped_lock lock(*internal_mutex_ptr_);
 
 		if (reader_thread_id_.contains(std::this_thread::get_id()))
 		{
-			external_mutex_->unlock_shared();
+			external_mutex_ptr_->unlock_shared();
 			reader_thread_id_.erase(std::this_thread::get_id());
 		}
 		else
@@ -109,7 +110,7 @@ namespace rwlock
 
 	bool rwlock::write_lock(const int64_t timeout_ms)
 	{
-		std::unique_lock lock(*internal_mutex_);
+		std::unique_lock lock(*internal_mutex_ptr_);
 
 		if (writer_thread_id_ == std::this_thread::get_id())
 		{
@@ -139,11 +140,11 @@ namespace rwlock
 
 	void rwlock::write_unlock()
 	{
-		std::scoped_lock lock(*internal_mutex_);
+		std::scoped_lock lock(*internal_mutex_ptr_);
 
 		if (writer_thread_id_ == std::this_thread::get_id())
 		{
-			external_mutex_->unlock();
+			external_mutex_ptr_->unlock();
 			writer_thread_id_ = std::thread::id();
 		}
 		else
@@ -154,13 +155,13 @@ namespace rwlock
 
 	bool rwlock::is_write_locked_for_this_thread() const
 	{
-		std::scoped_lock lock(*internal_mutex_);
+		std::scoped_lock lock(*internal_mutex_ptr_);
 		return writer_thread_id_ == std::this_thread::get_id();
 	}
 
 	bool rwlock::is_read_locked_for_this_thread() const
 	{
-		std::scoped_lock lock(*internal_mutex_);
+		std::scoped_lock lock(*internal_mutex_ptr_);
 		return reader_thread_id_.contains(std::this_thread::get_id());
 	}
 }
