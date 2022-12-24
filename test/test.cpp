@@ -7,6 +7,7 @@
 
 #include <memory>
 #include <chrono>
+#include <future>
 
 TEST(rwlock, no_lock)
 {
@@ -161,41 +162,148 @@ TEST(readers_writer_lock, lock)
 	EXPECT_TRUE(writer1.is_locked());
 }
 
-//class rwlocked_data final
-//{
-//	std::string data_;
-//	mutable std::shared_ptr<rwlock::rwlock> rwlock_ptr_;
-//	std::condition_variable_any condition_var_any_;
-//public:
-//	rwlocked_data() : data_("some data"), rwlock_ptr_(new rwlock::rwlock)
-//	{
-//	}
-//
-//	std::string read() const
-//	{
-//		rwlock::reader_lock lock(rwlock_ptr_, true);
-//
-//		
-//
-//		return data_;
-//	}
-//
-//	void write()
-//	{
-//		rw
-//	}
-//};
+class rwlocked_string final
+{
+	std::string data_;
+	mutable std::shared_ptr<rwlock::rwlock> rwlock_ptr_;
 
-TEST(readers_writer_lock, single_thread_time_test)
+public:
+	rwlocked_string(const std::string& buf = {}) : rwlock_ptr_(new rwlock::rwlock)
+	{
+		write(buf, 0);
+	}
+
+	std::string read(const int64_t timeout = 0) const
+	{
+		rwlock::reader_lock lock(rwlock_ptr_, true, timeout);
+
+		while (!lock.is_locked())
+		{
+			lock.lock(timeout);
+		}
+
+		return data_;
+	}
+
+	void write(const std::string& buf, const int64_t timeout = 0)
+	{
+		rwlock::writer_lock lock(rwlock_ptr_, true, timeout);
+
+		while (!lock.is_locked())
+		{
+			lock.lock(timeout);
+		}
+
+		data_ = buf;
+	}
+};
+
+
+void multithreading_test(
+	enum class std::launch type = std::launch::async,
+	int64_t timeout = 0
+)
+{
+	rwlocked_string shared_string{"initial"};
+
+	//for (int i = 0; i < 10000; ++i)
+	//{
+	//	std::jthread reader(
+	//		&rwlocked_string::read,
+	//		shared_string,
+	//		5
+	//	);
+	//}
+
+	//std::jthread writer(
+	//	&rwlocked_string::write,
+	//	shared_string,
+	//	5
+	//);
+	//std::jthread write1(
+	//	&rwlocked_string::write,
+	//	shared_string,
+	//	"write1",
+	//	timeout
+	//);
+
+	//write1.join();
+
+	//std::future<std::string> read1 = std::async(
+	//	type,
+	//	&rwlocked_string::read,
+	//	shared_string,
+	//	timeout
+	//);
+
+	//std::future<std::string> read2 = std::async(
+	//	type,
+	//	&rwlocked_string::read,
+	//	shared_string,
+	//	timeout
+	//);
+
+	//std::future<std::string> read3 = std::async(
+	//	type,
+	//	&rwlocked_string::read,
+	//	shared_string,
+	//	timeout
+	//);
+
+	//std::future<std::string> read4 = std::async(
+	//	type,
+	//	&rwlocked_string::read,
+	//	shared_string,
+	//	timeout
+	//);
+
+	//std::future<std::string> read5 = std::async(
+	//	type,
+	//	&rwlocked_string::read,
+	//	shared_string,
+	//	0
+	//);
+	//std::cout << read1.get() << std::endl;
+	//std::cout << read2.get() << std::endl;
+	//std::cout << read3.get() << std::endl;
+	//std::cout << read4.get() << std::endl;
+	//std::cout << read5.get() << std::endl;
+
+	/*EXPECT_TRUE(read1.get() == std::string{"write1"});
+	EXPECT_TRUE(read2.get() == std::string{"write1"});
+	EXPECT_TRUE(read3.get() == std::string{"write1"});
+	EXPECT_TRUE(read4.get() == std::string{"write1"});
+	EXPECT_TRUE(read5.get() == std::string{"write1"});*/
+}
+
+
+TEST(readers_writer_lock, time_test)
 {
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
+	rwlocked_string shared_string{ "initial" };
 
+	for (int i = 0; i < 100; ++i)
+	{
+		std::jthread reader(
+			&rwlocked_string::read,
+			shared_string,
+			5
+		);
+		reader.detach();
+	}
 
+	std::jthread writer(
+		&rwlocked_string::write,
+		shared_string,
+		"final",
+		5
+	);
+
+	writer.join();
 
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
-	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
 }
 
 
@@ -203,9 +311,22 @@ TEST(readers_writer_lock, multi_thread_time_test)
 {
 	std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
+	rwlocked_string shared_string{ "initial" };
 
+	for (int i = 0; i < 100; ++i)
+	{
+		//shared_string.read(5);
+
+		std::jthread reader(
+			&rwlocked_string::read,
+			shared_string,
+			5
+		);
+		reader.join();
+	}
+
+	shared_string.write("final", 5);
 
 	std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
-	std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
 }
