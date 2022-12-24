@@ -130,7 +130,6 @@
   <ItemGroup>
     <ClInclude Include="reader_lock.h" />
     <ClInclude Include="rwlock.h" />
-    <ClInclude Include="rwlock_exception.h" />
     <ClInclude Include="writer_lock.h" />
   </ItemGroup>
   <ItemGroup>

@@ -7,16 +7,8 @@ namespace rwlock
 {
 	class rwlock final
 	{
-        std::unordered_set<std::thread::id> reader_thread_id_;
-        std::thread::id writer_thread_id_;
-
-		std::unique_ptr<std::shared_mutex> external_mutex_ptr_;
-		std::unique_ptr<std::mutex> internal_mutex_ptr_;
-
-        std::condition_variable condition_variable_;
-
-        bool try_write_lock()   noexcept;
-        bool try_read_lock()    noexcept;
+		std::unique_ptr<std::shared_timed_mutex> shared_timed_mutex_ptr_;
+		mutable std::mutex internal_mutex_;
 
 	public: 
         explicit rwlock();
@@ -29,13 +21,10 @@ namespace rwlock
 
         ~rwlock() = default;
 
-        bool read_lock(int64_t timeout_ms = 0);
-        void read_unlock();
+        bool read_lock(int64_t timeout_ms = -1) const;
+        void read_unlock() const;
 
-        bool write_lock(int64_t timeout_ms = 0);
+        bool write_lock(int64_t timeous_ms = -1);
         void write_unlock();
-
-        [[nodiscard]] bool is_write_locked_for_this_thread() const;
-        [[nodiscard]] bool is_read_locked_for_this_thread()  const;
 	};
 }

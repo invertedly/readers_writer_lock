@@ -20,9 +20,6 @@
     <ClInclude Include="writer_lock.h">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="rwlock_exception.h">
-      <Filter>Project Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="reader_lock.cpp">
